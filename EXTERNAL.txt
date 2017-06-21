@@ -1,0 +1,1 @@
+firmware/atoms https://github.com/yaqwsx/Atoms/ 4f3fd20922b2c48ab4e8b29cd38e345a30611ddb

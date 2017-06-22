@@ -40,7 +40,7 @@ int getCalibratedValue(int val, int vMin, int vMax, int min, int max, bool clamp
     return result;
 }
 
-void packet_send_color_sensors (ev3cxx::Bluetooth & bt, int lCalVal, int rCalVal, int error) {
+void packet_send_color_sensors (ev3cxx::Bluetooth & bt, int lCalVal, int rCalVal, int errorNeg) {
     AvakarPacket packetOut;
 
     packetOut.set_command(0);
@@ -50,20 +50,20 @@ void packet_send_color_sensors (ev3cxx::Bluetooth & bt, int lCalVal, int rCalVal
     packetOut.push<uint8_t>(lCalVal);
     packetOut.push<uint8_t>(rCalVal);
     packetOut.push<uint8_t>(lCalVal + rCalVal);
-    packetOut.push<int8_t>(error);
+    packetOut.push<int8_t>(errorNeg);
     for(char ch: packetOut) {
         bt.write(ch); 
     }
     packetOut.clear();
 }
 
-void packet_send_motors_line(ev3cxx::Bluetooth & bt, int motorLSpeed, int motorRSpeed, int errorLine) {
+void packet_send_motors_line(ev3cxx::Bluetooth & bt, int motorLSpeed, int motorRSpeed, int errorNegLine) {
     AvakarPacket packetOut;
 
     packetOut.set_command(1);
     packetOut.push<int16_t>(motorLSpeed);
     packetOut.push<int16_t>(motorRSpeed);
-    packetOut.push<int16_t>(errorLine);
+    packetOut.push<int16_t>(errorNegLine);
     for(char ch: packetOut) {
         bt.write(ch); 
     }
@@ -73,7 +73,7 @@ void packet_send_motors_line(ev3cxx::Bluetooth & bt, int motorLSpeed, int motorR
 void main_task(intptr_t unused) {
     ev3cxx::Bluetooth bt{true};
 
-    char welcomeString[] = "\r\tEV3RT ev3cxx \n\tColorSen2x\nInitialization...\n";
+    char welcomeString[] = "\r\tK-ranka \nev3cxx-ketchup\nInitialization...\n";
 
     format(bt, "\n\n% ") % welcomeString;
     display.format("% ") % welcomeString;
@@ -96,13 +96,16 @@ void main_task(intptr_t unused) {
     lMin = rMin = 100;
     lMax = rMax = 0;
     
-    int error;
+    int errorNeg, errorPos;
+    const int errorPosThreshold = 80;
+    const int errorStopWithoutLineThres = 20;
     const int threshold = 70;
 
     int errorLine = 0;
-    const int errorLineCorrection = 100;
+    const int errorNegLineCorrection = 100;
     int startSpeed = 20;
     int motorLSpeed, motorRSpeed;
+    int targetDistance = -1;
 
     // Calibration
     display.format("Cal => ENTER\n");
@@ -132,7 +135,7 @@ void main_task(intptr_t unused) {
         format(bt, "lMin:%3  lMax:%3\t") % lMin % lMax;
         format(bt, "rMin:%3  rMax:%3\n") % rMin % rMax; 
     }
-    ev3cxx::delayMs(1000);
+    ev3cxx::delayMs(500);
     motors.leftMotor().resetPosition();
     motors.rightMotor().resetPosition();
     motors.onForDegrees(-10, 10, motorsCalibrationDegrees/2, false, true);
@@ -164,31 +167,49 @@ void main_task(intptr_t unused) {
             //display.format("\rL%3:%3 R%3:%3") % lVal % lCalVal % rVal % rCalVal;
             
             if(rCalVal > threshold || lCalVal > threshold)
-                error = 100;
+                errorNeg = 100;
             else
-                error = rCalVal - lCalVal;
+                errorNeg = rCalVal - lCalVal;
 
             // Hack 2
-            error = rCalVal - lCalVal;
+            errorNeg = rCalVal - lCalVal;
+            errorPos = rCalVal + lCalVal;
 
-            packet_send_color_sensors(bt, lCalVal, rCalVal, error);
+            packet_send_color_sensors(bt, lCalVal, rCalVal, errorNeg);
 
-            errorLine = (lCalVal + rCalVal) - errorLineCorrection;
+            errorLine = (lCalVal + rCalVal) - errorNegLineCorrection;
             errorLine /= 4;
 
             if(lCalVal > rCalVal)
                 errorLine *= -1;
 
             // Hack 3
-            errorLine = error / 8;
+            errorLine = errorNeg / 12;
 
             motorLSpeed = startSpeed + errorLine;
             motorRSpeed = startSpeed - errorLine;
 
-            motors.on(motorRSpeed, motorLSpeed);
+            if(targetDistance < motors.leftMotor().degrees() && errorPos < errorPosThreshold) {
+            //     format(bt, "\r\n\nlCalVal:%4  rCalVal:%4  errorPos:%5") % lCalVal % rCalVal % 200;
+            //     format(bt, "\r\n\nlCalVal:%4  rCalVal:%4  errorPos:%5") % lCalVal % rCalVal % 200
+                ev3cxx::statusLight.setColor(ev3cxx::StatusLightColor::ORANGE);
+                motors.on(0, 0);
+                ev3cxx::delayMs(1000);
+                //motors.onForDegrees(startSpeed, startSpeed, 360);
+                targetDistance = motors.leftMotor().degrees() + 180;
+            } 
+            // else if((lCalVal < errorStopWithoutLineThres) && (rCalVal < errorStopWithoutLineThres)) {
+            //     motors.on(0, 0);
+            //     ev3cxx::statusLight.setColor(ev3cxx::StatusLightColor::RED);
+            // } 
+            else {
+                ev3cxx::statusLight.setColor(ev3cxx::StatusLightColor::GREEN);
+                motors.on(motorRSpeed, motorLSpeed);
+            }
+
             display.format("\r  L%2 R %2 E%2") % motorLSpeed % motorRSpeed % errorLine;
 
-            //packet_send_motors_line(bt, motorLSpeed, motorRSpeed, errorLine);
+            //packet_send_motors_line(bt, motorLSpeed, motorRSpeed, errorNegLine);
 
             ev3cxx::delayMs(5);
         }

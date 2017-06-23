@@ -1,0 +1,9 @@
+{
+    "welcome":{
+        "robo": "ROBOTARNA",
+        "web": "robotikabrno.cz",
+        "name": "K-ranka",
+        "authors": "Jarek, Honza, Martin",
+        "version": "1.0.0"
+    }
+}

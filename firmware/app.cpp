@@ -6,6 +6,9 @@
 
 #include <cstdlib>
 #include <cmath>
+#include <string>
+#include <fstream>
+#include <streambuf>
 
 #include "ev3cxx.h"
 #include "app.h"
@@ -14,8 +17,9 @@
 #define ATOMS_NO_EXCEPTION
 #include <atoms/communication/avakar.h>
 #include <atoms/numeric/rolling_average.h> 
+#include "json11.hpp"
 
-//#include "Detector.h"
+#include "Detector.h"
 
 using ev3cxx::display;
 using ev3cxx::format;
@@ -70,13 +74,34 @@ void packet_send_motors_line(ev3cxx::Bluetooth & bt, int motorLSpeed, int motorR
     packetOut.clear();
 }
 
+void display_intro(json11::Json config, ev3cxx::detail::Display &display){
+    display.resetScreen();
+    json11::Json welcome = config["welcome"].object_items();
+    display.format("\n \n \n");
+    display.format(" % \n") % welcome["robo"].string_value();
+    display.format(" % ") % welcome["web"].string_value();
+    ev3cxx::delayMs(1500);
+    display.resetScreen();
+    display.format("\n \n \n");
+    display.format("Name: % \n") % welcome["name"].string_value();
+    display.setFont(EV3_FONT_SMALL);
+    display.format("Version: % \n") % welcome["version"].string_value();
+    display.format("Authors: % \n")  % welcome["authors"].string_value();
+    display.setFont(EV3_FONT_MEDIUM);
+}
+
+json11::Json load_config(std::string fileName){
+    std::ifstream configFile(fileName);
+    std::string configJson((std::istreambuf_iterator<char>(configFile)),
+                 std::istreambuf_iterator<char>());
+    
+    std::string ErrorMsg = std::string("Json parsing error");
+    return json11::Json::parse(configJson, ErrorMsg);
+    //json11::Json config = json11::Json::parse(configJson, ErrorMsg);
+}
+
 void main_task(intptr_t unused) {
     ev3cxx::Bluetooth bt{true};
-
-    char welcomeString[] = "\r\tEV3RT ev3cxx \n\tColorSen2x\nInitialization...\n";
-
-    format(bt, "\n\n% ") % welcomeString;
-    display.format("% ") % welcomeString;
 
     ev3cxx::ColorSensor colorL{ev3cxx::SensorPort::S1};
     ev3cxx::ColorSensor colorR{ev3cxx::SensorPort::S4};
@@ -104,9 +129,12 @@ void main_task(intptr_t unused) {
     int startSpeed = 20;
     int motorLSpeed, motorRSpeed;
 
-    // Calibration
-    display.format("Cal => ENTER\n");
-    format(bt,"Cal => ENTER\n");
+    json11::Json config = load_config("config.json");
+    display_intro(config, display);
+
+    display.setFont(EV3_FONT_SMALL);
+    display.format(" \n Press ENTER to begin\n");
+    display.setFont(EV3_FONT_MEDIUM);
     while(!btnEnter.isPressed()) {
         ev3cxx::delayMs(10);
     }

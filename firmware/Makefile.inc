@@ -1,6 +1,6 @@
 APPL_COBJS += 
 
-APPL_CXXOBJS +=
+APPL_CXXOBJS += json11.o
 
 SRCLANG := c++
 

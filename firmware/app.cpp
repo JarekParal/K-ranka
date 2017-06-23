@@ -20,6 +20,10 @@
 #include "json11.hpp"
 
 #include "Detector.h"
+#include "libs/logging/logging.hpp"
+#include "libs/logging/FileLogSink.h"
+#include "libs/logging/DisplayLogSink.h"
+#include "libs/logging/BTLogSink.h"
 
 using ev3cxx::display;
 using ev3cxx::format;
@@ -88,6 +92,7 @@ void display_intro(json11::Json config, ev3cxx::detail::Display &display){
     display.format("Version: % \n") % welcome["version"].string_value();
     display.format("Authors: % \n")  % welcome["authors"].string_value();
     display.setFont(EV3_FONT_MEDIUM);
+    ev3cxx::delayMs(1500);
 }
 
 json11::Json load_config(std::string fileName){
@@ -129,6 +134,10 @@ void main_task(intptr_t unused) {
     int motorLSpeed, motorRSpeed;
     int targetDistance = -1;
 
+    Logger l;
+    l.addSink(ALL, std::unique_ptr<LogSink>(new FileLogSink("log.txt", 80)));
+    l.addSink(ALL, std::unique_ptr<LogSink>(new DisplayLogSink(display, 15, 16)));
+    l.addSink(ALL, std::unique_ptr<LogSink>(new BTLogSink(bt, 80)));
 
     json11::Json config = load_config("config.json");
     display_intro(config, display);
@@ -136,6 +145,7 @@ void main_task(intptr_t unused) {
     display.setFont(EV3_FONT_SMALL);
     display.format(" \n Press ENTER to begin\n");
     display.setFont(EV3_FONT_MEDIUM);
+    
     while(!btnEnter.isPressed()) {
         ev3cxx::delayMs(10);
     }

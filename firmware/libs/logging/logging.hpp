@@ -129,4 +129,3 @@ struct DummyClock {
 
 using LogSink = BaseLogSink< std::string >;
 using Logger = BaseLogger< std::string, DummyClock >;
-//using FileLogSink = FileLogSink< std::string >;

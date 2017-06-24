@@ -12,6 +12,10 @@
 
 using ev3cxx::display;
 
+template <typename T> int sgn(T val) {
+    return (T(0) < val) - (val < T(0));
+}
+
 struct LineSensor {
     LineSensor( ev3cxx::ColorSensor& s ) : _sensor( s ) { }
 
@@ -67,10 +71,9 @@ void packet_send_motors_line(ev3cxx::Bluetooth & bt, int motorLSpeed, int motorR
 class Robot {
 public:
     enum class State {
-        PositionReached,
+        PositionReached = 0,
+        KetchupDetected,
         RivalDetected,
-        StopBtnPressed,
-        KetchupDetected
     };
 
     enum Debug {
@@ -111,22 +114,17 @@ public:
         // => If the sensor is not connected then the program freezes
         lineL._sensor.reflected();
         lineR._sensor.reflected();
-
-        motors.onForDegrees(30,30, robotGeometry.distanceToDegrees(200));
-        motors.onForDegrees(20, -20, robotGeometry.rotateDegrees(360));
     }
 
     void calibrateSensor(Debug debugLocal = Debug::Default) {
         debugCheckGlobal(debugLocal);
-        const int robotCalibrationDegrees = 360;
+        const int robotCalDeg = 360;
 
         motors.leftMotor().resetPosition();
         motors.rightMotor().resetPosition();
-        motors.onForDegrees(10, -10, 
-            robotGeometry.rotateDegrees(robotCalibrationDegrees), true, false);
-
-        while((motors.leftMotor().degrees() < (robotCalibrationDegrees - 10)) &&
-              (motors.rightMotor().degrees() < (robotCalibrationDegrees - 10)))
+        motors.on(25, -25);
+        while((motors.leftMotor().degrees() < robotGeometry.rotateDegrees(robotCalDeg)) &&
+              (motors.rightMotor().degrees() < robotGeometry.rotateDegrees(robotCalDeg)))
         {
             ev3cxx::delayMs(10);
 
@@ -143,9 +141,52 @@ public:
         return { r - l, r + l };
     }
 
+    State _moveForward( int distanceMm ) {
+        int distanceDeg = robotGeometry.distanceToDegrees( distanceMm );
+        motors.leftMotor().resetPosition();
+        motors.rightMotor().resetPosition();
+        motors.on( forwardSpeed, forwardSpeed );
+        ev3cxx::delayMs( 5 );
+        while( motors.leftMotor().degrees() < distanceDeg &&
+               motors.rightMotor().degrees() < distanceDeg )
+        {
+            if ( btnStop.isPressed() ) {
+                std::exit( 1 );
+            }
+            ev3cxx::delayMs( 5 );
+        }
+        return State::PositionReached;
+    }
+
+    State _rotate( int degrees ) {
+        int distanceDeg = robotGeometry.rotateDegrees( degrees );
+        motors.leftMotor().resetPosition();
+        motors.rightMotor().resetPosition();
+        if ( degrees > 0)
+            motors.on( forwardSpeed, -forwardSpeed );
+        else
+            motors.on( -forwardSpeed, forwardSpeed );
+
+        while( motors.leftMotor().degrees() < distanceDeg &&
+               motors.rightMotor().degrees() < distanceDeg )
+        {
+            if ( btnStop.isPressed() ) {
+                std::exit( 1 );
+            }
+             ev3cxx::delayMs(5);
+        }
+        return State::PositionReached;
+    }
+
     State _step(Debug debugLocal = Debug::Default) {
-        int target = motors.leftMotor().degrees() + distanceTargetDiff;
+        int target = robotGeometry.distanceToDegrees( 40 );
+        motors.leftMotor().resetPosition();
+        motors.rightMotor().resetPosition();
+        lineL._aSlow.clear( 100 );
         lineR._aSlow.clear( 100 );
+
+        atoms::RollingAverage< float, 50 > ketchupTrigger;
+        ev3cxx::statusLight.setColor( ev3cxx::StatusLightColor::GREEN );
         while( true ) {
             int errorNeg = lineR.reflectedFast() - lineL.reflectedFast();
             int errorPos = lineR.reflectedSlow() + lineL.reflectedSlow();
@@ -154,35 +195,25 @@ public:
             int motorLSpeed = forwardSpeed + speedGain;
             int motorRSpeed = forwardSpeed - speedGain;
 
-            if( btnStop.isPressed() ) {
-                ev3cxx::statusLight.setColor( ev3cxx::StatusLightColor::RED );
-                return State::StopBtnPressed;
+            if ( btnStop.isPressed() ) {
+                std::exit( 1 );
             }
-            else if ( motors.leftMotor().degrees() > target && errorPos < errorPosThreshold )
-            {
+            if ( motors.leftMotor().degrees() > target && errorPos < errorPosThreshold ) {
                 ev3cxx::statusLight.setColor( ev3cxx::StatusLightColor::ORANGE );
                 return State::PositionReached;
             }
-            else if ( !ketchupSensor.isPressed() ) {
-                motors.leftMotor().resetPosition();
-                motors.rightMotor().resetPosition();
-                while ( motors.leftMotor().degrees() < robotGeometry.distanceToDegrees(70)) {
-                    if( btnStop.isPressed() ) {
-                        ev3cxx::statusLight.setColor( ev3cxx::StatusLightColor::RED );
-                        return State::StopBtnPressed;
-                    }
-                }
-                return State::KetchupDetected;
+            if ( !ketchupSensor.isPressed() ) {
+                ketchupTrigger.push( 1 );
             }
             else {
-                ev3cxx::statusLight.setColor( ev3cxx::StatusLightColor::GREEN );
-                motors.on( motorRSpeed, motorLSpeed );
+                ketchupTrigger.push( 0 );
+            }
+            if ( ketchupTrigger.get_average() > 0.9 ) {
+                auto s = _moveForward( 25 );
+                return std::max( State::KetchupDetected, s );
             }
 
-            // if(DETECTOR) {
-            //     return State::RivalDetected;
-            // }
-
+            motors.on( motorRSpeed, motorLSpeed );
             ev3cxx::delayMs(5);
         }
     }
@@ -192,73 +223,35 @@ public:
 
         for ( int cntOfStep = 0; cntOfStep < numberOfStep; ++cntOfStep ) {
             returnState = _step( debugLocal );
-            if ( returnState != State::PositionReached && returnState != State::KetchupDetected )
+            if ( returnState != State::PositionReached && returnState != State::KetchupDetected ) {
                 return returnState;
-        }
-        motors.leftMotor().resetPosition();
-        motors.rightMotor().resetPosition();
-        motors.on( forwardSpeed, forwardSpeed );
-        while ( motors.leftMotor().degrees() < robotGeometry.distanceToDegrees(70)) {
-            if( btnStop.isPressed() ) {
-                ev3cxx::statusLight.setColor( ev3cxx::StatusLightColor::RED );
-                return State::StopBtnPressed;
             }
         }
-        return returnState;
+        auto s = _moveForward( 70 );
+        ev3cxx::statusLight.setColor( ev3cxx::StatusLightColor::RED );
+        return std::max( returnState, s );
     }
 
     State rotate(int degrees, Debug debugLocal = Debug::Default) {
-        ev3cxx::statusLight.setColor(ev3cxx::StatusLightColor::ORANGE);
+        ev3cxx::statusLight.setColor(ev3cxx::StatusLightColor::GREEN);
+        lineL._aSlow.clear( 100 );
         lineR._aSlow.clear( 100 );
-        motors.leftMotor().resetPosition();
-        motors.rightMotor().resetPosition();
 
-        float steps = 1.10 * abs( degrees ) / 90;
-
-        if(degrees > 0) {
-            motors.on(forwardSpeed, -forwardSpeed);
-        } else {
-            motors.on(-forwardSpeed, forwardSpeed);
-        }
-
-        while(motors.leftMotor().degrees() < steps * rotateSensorDistanceDiff &&
-              motors.rightMotor().degrees() < steps * rotateSensorDistanceDiff)
-        {
-            if(btnStop.isPressed()) {
-                motors.off(false);
-                ev3cxx::statusLight.setColor(ev3cxx::StatusLightColor::RED);
-                return State::StopBtnPressed;
-            }
-            ev3cxx::delayMs(1);
-        }
-
-        ev3cxx::delayMs(1);
+        int odoDeg = sgn( degrees ) * ( abs( degrees ) - 40 );
+        _rotate( odoDeg );
 
         ev3cxx::statusLight.setColor(ev3cxx::StatusLightColor::RED);
+
         while(lineL.reflectedSlow() > rotateSensorThreshold &&
               lineR.reflectedSlow() > rotateSensorThreshold)
         {
-           if(btnStop.isPressed()) {
-                motors.off(false);
-                ev3cxx::statusLight.setColor(ev3cxx::StatusLightColor::RED);
-                return State::StopBtnPressed;
-            }
+           if ( btnStop.isPressed() )
+                std::exit( 1 );
             ev3cxx::delayMs(1);
         }
-        log.logInfo("", "X: {}, {}", lineL.reflectedSlow(), lineR.reflectedSlow() );
 
-        motors.leftMotor().resetPosition();
-        motors.rightMotor().resetPosition();
-        while( motors.leftMotor().degrees() < 10 &&
-               motors.rightMotor().degrees() < 10)
-        {
-            if(btnStop.isPressed()) {
-                motors.off(false);
-                ev3cxx::statusLight.setColor(ev3cxx::StatusLightColor::RED);
-                return State::StopBtnPressed;
-            }
-            ev3cxx::delayMs(1);
-        }
+        ev3cxx::statusLight.setColor(ev3cxx::StatusLightColor::ORANGE);
+        _rotate( sgn( degrees ) * 10 );
 
         motors.off();
         return State::PositionReached;

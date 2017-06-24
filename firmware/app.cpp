@@ -88,10 +88,6 @@ json11::Json load_config(std::string fileName){
     std::string ErrorMsg = std::string("Json parsing error");
     return json11::Json::parse(configJson, ErrorMsg);
 }
-void main_task(intptr_t unused) {
-    bool btnSkip = false;
-    //Robot.Debug debugInfo = Robot.Debug::No;
-    RobotGeometry robotGeometry{55, 125};
 
     ev3cxx::Bluetooth bt{true};
 
@@ -105,6 +101,10 @@ void main_task(intptr_t unused) {
     ev3cxx::Motor motorR{ev3cxx::MotorPort::C};
     ev3cxx::MotorTank motors{ev3cxx::MotorPort::B, ev3cxx::MotorPort::C};
 
+void main_task(intptr_t unused) {
+    //Robot.Debug debugInfo = Robot.Debug::No;
+    RobotGeometry robotGeometry{55, 125};
+
     Logger l;
     l.addSink(ALL, std::unique_ptr<LogSink>(new FileLogSink("log.txt", 80)));
     l.addSink(ALL, std::unique_ptr<LogSink>(new DisplayLogSink(display, 15, 16)));
@@ -114,12 +114,7 @@ void main_task(intptr_t unused) {
     display_intro(config, display);
 
     display.setFont(EV3_FONT_SMALL);
-    display.format(" \n Press ENTER to begin\n");
     display.setFont(EV3_FONT_MEDIUM);
-
-    while(!btnEnter.isPressed()) {
-        ev3cxx::delayMs(10);
-    }
 
     char welcomeString[] = "\r\tK-ranka 2021\nev3cxx-ketchup\nInitialization...\n";
     format(bt, "\n\n% ") % welcomeString;
@@ -127,14 +122,13 @@ void main_task(intptr_t unused) {
     Robot robot{robotGeometry, colorL, colorR, ketchupSensor, btnEnter, btnStop, motors,
         l, bt, Robot::Debug(Robot::Debug::Text | Robot::Debug::Packet)};
     robot.init();
-
-    waitForButton(btnEnter, l, "Cal => ENTER\n", false);
     display.resetScreen();
     robot.calibrateSensor();
 
     while(true) {
         waitForButton(btnEnter, l, "Run => ENTER\n", false);
-        robot.step(2);
+        robot.step(1);
+        // robot.rotate( 90 );
         motors.off(false);
     }
 }

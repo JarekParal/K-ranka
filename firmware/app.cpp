@@ -1,7 +1,7 @@
 /**
- * This is sample program for testing two Color sensors in EV3RT C++ API.
+ * Robot K-ranka program for the Ketchup House competition (Robotics Day 2017).
  *
- * Author: Jaroslav Páral (jarekparal)
+ * Author: Jan Mrázek (yaqwsx), Martin Mikšík (mamiksik), Jaroslav Páral (jarekparal)
  */
 
 #include <cstdlib>
@@ -13,22 +13,22 @@
 #include "ev3cxx.h"
 #include "app.h"
 
-
 #define ATOMS_NO_EXCEPTION
 #include <atoms/communication/avakar.h>
 #include <atoms/numeric/rolling_average.h> 
+
 #include "json11.hpp"
 
+#include "Robot.h"
 #include "Detector.h"
 #include "libs/logging/logging.hpp"
 #include "libs/logging/FileLogSink.h"
 #include "libs/logging/DisplayLogSink.h"
 #include "libs/logging/BTLogSink.h"
 
+
 using ev3cxx::display;
 using ev3cxx::format;
-using atoms::AvakarPacket;
-using atoms::RollingAverage;
 
 void calibrateSensor(int val, int& min, int& max) {
     if(max < val)
@@ -48,34 +48,14 @@ int getCalibratedValue(int val, int vMin, int vMax, int min, int max, bool clamp
     return result;
 }
 
-void packet_send_color_sensors (ev3cxx::Bluetooth & bt, int lCalVal, int rCalVal, int errorNeg) {
-    AvakarPacket packetOut;
-
-    packetOut.set_command(0);
-    // packetOut.push<uint8_t>(lVal);
-    // packetOut.push<uint8_t>(rVal);
-    // packetOut.push<uint8_t>(lVal + rVal);
-    packetOut.push<uint8_t>(lCalVal);
-    packetOut.push<uint8_t>(rCalVal);
-    packetOut.push<uint8_t>(lCalVal + rCalVal);
-    packetOut.push<int8_t>(errorNeg);
-    for(char ch: packetOut) {
-        bt.write(ch); 
+void waitForSomething(ev3cxx::BrickButton& btn, ev3cxx::Bluetooth& bt, std::string msg, bool skip = false) {
+    if(!skip) {
+        display.format("% ") % msg;
+        format(bt,"% ") % msg;
+        while(!btn.isPressed()) {
+            ev3cxx::delayMs(10);
+        }
     }
-    packetOut.clear();
-}
-
-void packet_send_motors_line(ev3cxx::Bluetooth & bt, int motorLSpeed, int motorRSpeed, int errorNegLine) {
-    AvakarPacket packetOut;
-
-    packetOut.set_command(1);
-    packetOut.push<int16_t>(motorLSpeed);
-    packetOut.push<int16_t>(motorRSpeed);
-    packetOut.push<int16_t>(errorNegLine);
-    for(char ch: packetOut) {
-        bt.write(ch); 
-    }
-    packetOut.clear();
 }
 
 void display_intro(json11::Json config, ev3cxx::detail::Display &display){
@@ -103,8 +83,11 @@ json11::Json load_config(std::string fileName){
     std::string ErrorMsg = std::string("Json parsing error");
     return json11::Json::parse(configJson, ErrorMsg);
 }
-
 void main_task(intptr_t unused) {
+    bool btnSkip = false;
+    //Robot.Debug debugInfo = Robot.Debug::No;
+    RobotGeometry robotGeometry{55, 125};
+
     ev3cxx::Bluetooth bt{true};
 
     ev3cxx::ColorSensor colorL{ev3cxx::SensorPort::S1};
@@ -116,23 +99,6 @@ void main_task(intptr_t unused) {
     ev3cxx::Motor motorL{ev3cxx::MotorPort::B};
     ev3cxx::Motor motorR{ev3cxx::MotorPort::C};
     ev3cxx::MotorTank motors{ev3cxx::MotorPort::B, ev3cxx::MotorPort::C};
-
-    int lCalVal, rCalVal;
-    RollingAverage<int, 3> lAvgVal, rAvgVal;
-
-    // Init ColorSensor:
-    // colorL.reflected() is blocking function 
-    // => If the sensor is not connected then the program freezes
-    colorL.reflected();
-    colorR.reflected();
-    
-    int errorNeg, errorPos;
-    const int errorPosThreshold = 80;
-
-    int errorLine = 0;
-    int startSpeed = 20;
-    int motorLSpeed, motorRSpeed;
-    int targetDistance = -1;
 
     Logger l;
     l.addSink(ALL, std::unique_ptr<LogSink>(new FileLogSink("log.txt", 80)));
@@ -149,79 +115,41 @@ void main_task(intptr_t unused) {
     while(!btnEnter.isPressed()) {
         ev3cxx::delayMs(10);
     }
-    const int motorsCalibrationDegrees = 200;
-    display.format("Calibration start\n");
-    motors.onForDegrees(-10, 10, motorsCalibrationDegrees/2, false, true);
-    motors.leftMotor().resetPosition();
-    motors.rightMotor().resetPosition();
-    motors.onForDegrees(10, -10, motorsCalibrationDegrees, true, false);
     
-    while(motors.leftMotor().degrees() < (motorsCalibrationDegrees - 10)) {
-    //while(motorsCalibrationDegrees == approximately(motors.leftMotor().degrees() , 20)) {
-        ev3cxx::delayMs(10);
+    char welcomeString[] = "\r\tK-ranka 2021\nev3cxx-ketchup\nInitialization...\n";
+    format(bt, "\n\n% ") % welcomeString;
+    display.format("% ") % welcomeString;
+    Robot robot{robotGeometry, colorL, colorR, touchStop, btnEnter, btnStop, motors, 
+        bt, Robot::Debug(Robot::Debug::Text | Robot::Debug::Packet)};
+    robot.init();
 
-        colorL.calibrateReflection();
-        colorR.calibrateReflection();
+    waitForSomething(btnEnter, bt, "Cal => ENTER\n", true);
+    robot.calibrateSensor();
 
-        format(bt, "mL:%4 mR:%4  ") % motors.leftMotor().degrees() % motors.rightMotor().degrees(); 
-
-        display.format("\r%3:%3  %3:%3") % colorL.min() % colorL.max() % colorR.min() % colorR.max();
-        format(bt, "lMin:%3  lMax:%3\t") % colorL.min() % colorL.max();
-        format(bt, "rMin:%3  rMax:%3\n") % colorR.min() % colorR.max(); 
-    }
-    ev3cxx::delayMs(500);
-    motors.leftMotor().resetPosition();
-    motors.rightMotor().resetPosition();
-    motors.onForDegrees(-10, 10, motorsCalibrationDegrees/2, false, true);
-    display.format("Calibration stop\n");
-
-    // Start line follower
     while(true) {
-        display.format("Start => ENTER\n");
-        while(!btnEnter.isPressed()) {
-            ev3cxx::delayMs(10);
+        //waitForSomething(btnEnter, bt, "Start => ENTER\n", false);
+        bool skip = false;
+        std::string msg = "Start => ENTER\n";
+        if(!skip) {
+            display.format("% ") % msg.c_str();
+            format(bt,"% ") % msg.c_str();
+            while(!btnEnter.isPressed()) {
+                if(robot.debugState() & Robot::Debug::Packet)
+                    robot.packetColorReflected();
+                ev3cxx::delayMs(10);
+            }
         }
 
-        while(!btnStop.isPressed()) {
-            lCalVal = colorL.reflected(true, true);
-            rCalVal = colorR.reflected(true, true);
-
-            lAvgVal.push(lCalVal);
-            rAvgVal.push(rCalVal);
-
-            lCalVal = lAvgVal.get_average();
-            rCalVal = rAvgVal.get_average();
-
-            errorNeg = rCalVal - lCalVal;
-            errorPos = rCalVal + lCalVal;
-
-            packet_send_color_sensors(bt, lCalVal, rCalVal, errorNeg);
-
-            errorLine = errorNeg / 12;
-
-            motorLSpeed = startSpeed + errorLine;
-            motorRSpeed = startSpeed - errorLine;
-
-            if(touchStop.isPressed()) {
-                motors.off();
-                ev3cxx::statusLight.setColor(ev3cxx::StatusLightColor::RED);
-            } else if(targetDistance < motors.leftMotor().degrees() 
-                   && errorPos < errorPosThreshold) {
-                ev3cxx::statusLight.setColor(ev3cxx::StatusLightColor::ORANGE);
-                
-                motors.off();
-                ev3cxx::delayMs(1000);
-                targetDistance = motors.leftMotor().degrees() + 180;
-            } else {
-                ev3cxx::statusLight.setColor(ev3cxx::StatusLightColor::GREEN);
-                motors.on(motorRSpeed, motorLSpeed);
-            }
-
-            display.format("\r  L%2 R %2 E%2") % motorLSpeed % motorRSpeed % errorLine;
-
-            //packet_send_motors_line(bt, motorLSpeed, motorRSpeed, errorNegLine);
-
-            ev3cxx::delayMs(5);
+        robot.step(2);
+        format(bt, "\n\n\r");
+        
+        for(int i = 0; i < 2; i++) {
+            robot.rotate(-90);//, robot.Debug::Text + robot.Debug::Packet);
+            robot.step(1);
+            robot.rotate(-90);
+            robot.step(1);
+            robot.rotate(-90);
+            robot.step(1);
         }
         motors.off(false);
     }

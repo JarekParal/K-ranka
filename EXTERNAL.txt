@@ -1,1 +1,4 @@
-firmware/atoms https://github.com/yaqwsx/Atoms/ 4f3fd20922b2c48ab4e8b29cd38e345a30611ddb
+global:github.com/RoboticsBrno/RB-ev3rt-hrp2 
+d65b5c73e1ce168cd0927a3911aca7e9815f2a7d
+
+firmware/atoms https://github.com/yaqwsx/Atoms/ 5470369e38e497c1eade1b3171a288415be6d0fd

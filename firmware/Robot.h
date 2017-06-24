@@ -62,10 +62,10 @@ public:
 
     Robot(RobotGeometry& rGeometry, ev3cxx::ColorSensor& ColorL, ev3cxx::ColorSensor& ColorR, ev3cxx::TouchSensor& TouchStop,
     ev3cxx::BrickButton& BtnEnter, ev3cxx::BrickButton& BtnStop, ev3cxx::MotorTank& Motors, 
-    ev3cxx::Bluetooth& Bt, Debug DebugGlobal = Debug::No)
+    Logger& Log, ev3cxx::Bluetooth& Bt, Debug DebugGlobal = Debug::No)
     : robotGeometry(rGeometry),
     colorL(ColorL), colorR(ColorR), touchStop(TouchStop), btnEnter(BtnEnter), btnStop(BtnStop), 
-    motors(Motors), bt(Bt),
+    motors(Motors), log(Log), bt(Bt),
     speedStart(20),
     distanceTargetDiff(100),
     errorPosThreshold(80),
@@ -91,11 +91,6 @@ public:
         debugCheckGlobal(debugLocal);
         const int robotCalibrationDegrees = 360;
 
-        if(debugLocal == Debug::Text) {
-            display.format("Calibration start\n");
-            format(bt, "Calibration start\n");
-        }
-
         // motors.onForDegrees(-10, 10, robotCalibrationDegrees/2, false, true);
         motors.leftMotor().resetPosition();
         motors.rightMotor().resetPosition();
@@ -110,25 +105,12 @@ public:
 
             colorL.calibrateReflection();
             colorR.calibrateReflection();
-
-            if(debugLocal == Debug::Text) {
-                display.format("\r%3:%3  %3:%3") % colorL.min() % colorL.max() % colorR.min() % colorR.max();
-
-                format(bt, "mL:%4 mR:%4  ") % motors.leftMotor().degrees() % motors.rightMotor().degrees(); 
-                format(bt, "lMin:%3  lMax:%3\t") % colorL.min() % colorL.max();
-                format(bt, "rMin:%3  rMax:%3\n") % colorR.min() % colorR.max(); 
-            }
         }
         motors.off(false);
         // ev3cxx::delayMs(500);
         // motors.leftMotor().resetPosition();
         // motors.rightMotor().resetPosition();
         // motors.onForDegrees(-10, 10, robotCalibrationDegrees/2, false, true);
-
-        if(debugLocal == Debug::Text) {
-            display.format("\nCalibration stop\n");
-            format(bt, "Calibration stop\n");
-        }
     }
 
     void packetColorReflected() {
@@ -161,13 +143,15 @@ public:
         errorNeg = rCalVal - lCalVal;
         errorPos = rCalVal + lCalVal;
         
-        debugCheckGlobal(debugLocal);
-        if(debugLocal == Debug::Packet)
-            packet_send_color_sensors(bt, lCalVal, rCalVal, errorNeg);
+        // debugCheckGlobal(debugLocal);
+        // if(debugLocal == Debug::Packet)
+        //     packet_send_color_sensors(log, lCalVal, rCalVal, errorNeg);
     }
 
     State _step(Debug debugLocal = Debug::Default) {
         debugCheckGlobal(debugLocal);
+
+        log.logInfo("_STEP", "_STEP");
 
         int distanceTarget = motors.leftMotor().degrees() + distanceTargetDiff;
         lAvgVal.clear();
@@ -191,10 +175,6 @@ public:
             errorNeg = rCalVal - lCalVal;
             errorPos = rCalVal + lCalVal;
 
-            debugCheckGlobal(debugLocal);
-            if(debugLocal == Debug::Packet)
-                packet_send_color_sensors(bt, lCalVal, rCalVal, errorNeg);
-
             int errorLine = errorNeg / 12;
 
             int motorLSpeed = speedStart + errorLine;
@@ -216,8 +196,8 @@ public:
                 motors.on(motorRSpeed, motorLSpeed);
             }
 
-            if(debugLocal == Debug::Packet)
-                packet_send_motors_line(bt, motorLSpeed, motorRSpeed, errorLine);
+            // if(debugLocal == Debug::Packet)
+            //     packet_send_motors_line(log, motorLSpeed, motorRSpeed, errorLine);
 
             // if(DETECTOR) {
             //     return State::RivalDetected;
@@ -231,8 +211,7 @@ public:
         debugCheckGlobal(debugLocal);
         State returnState;
 
-        if(debugLocal == Debug::Text)
-            format(bt, "Step:%3\n") % numberOfStep;
+        log.logInfo("MOVE", "Step: {}") << numberOfStep;
 
         for(int cntOfStep = 0; cntOfStep < numberOfStep; ++cntOfStep) {
             returnState = _step(debugLocal);
@@ -256,8 +235,6 @@ public:
     // rotate() - int degrees => positive number rotate in mathematic direction (anticlock wise)
     void rotateOdometer(int degrees, Debug debugLocal = Debug::Default) {
         debugCheckGlobal(debugLocal);
-        if(debugLocal == Debug::Text)
-            format(bt, "Rot:%4\n") % degrees;
         
         motors.onForDegrees(speedStart, -speedStart, 
             robotGeometry.distanceDegrees(robotGeometry.rotateDegrees(degrees)));
@@ -270,17 +247,13 @@ public:
         ev3cxx::statusLight.setColor(ev3cxx::StatusLightColor::ORANGE);
         motors.leftMotor().resetPosition();
         motors.rightMotor().resetPosition();
+
+        log.logInfo("MOVE", "Rotate: {}") << degrees;
         
         if(degrees > 0) {
             motors.on(speedStart, -speedStart);
         } else {
             motors.on(-speedStart, speedStart);
-        }
-
-        if(debugLocal & Debug::Text) {
-            format(bt, "===> Direction:: %3 : %3  r:%4 d:%4\n") 
-                % colorL.reflected() % colorR.reflected()
-                % rotateSensorDistanceDiff % motors.leftMotor().degrees();
         }
 
         while(motors.leftMotor().degrees() < rotateSensorDistanceDiff && 
@@ -293,12 +266,6 @@ public:
             }
         }
 
-        if(debugLocal & Debug::Text) {
-            format(bt, "===> Direction:: %3 : %3  r:%4 d:%4\n") 
-                % colorL.reflected() % colorR.reflected()
-                % rotateSensorDistanceDiff % motors.leftMotor().degrees();
-        }
-
         ev3cxx::statusLight.setColor(ev3cxx::StatusLightColor::RED);
         while(colorL.reflected() > rotateSensorThreshold &&
               colorR.reflected() > rotateSensorThreshold) 
@@ -307,12 +274,6 @@ public:
                 motors.off(false);
                 ev3cxx::statusLight.setColor(ev3cxx::StatusLightColor::RED);
                 return State::StopBtnPressed;
-            }
-
-            if(debugLocal & Debug::Text) {
-                format(bt, "<=== Direction:: %3 : %3  r:%4 d:%4\n") 
-                    % colorL.reflected() % colorR.reflected()
-                    % rotateSensorDistanceDiff % motors.leftMotor().degrees();
             }
             ev3cxx::delayMs(50);
         }
@@ -332,11 +293,7 @@ public:
         Direction dir = Direction::Left;
         if(degrees < 0) {
             dir = Direction::Right;
-
-            if(debugLocal & Debug::Text)
-                format(bt, "Direction::Right\n");
         }
-
 
         motors.on(int(dir) * speedStart, int(dir) * -speedStart);
         
@@ -346,9 +303,8 @@ public:
         //     ev3cxx::ColorSensor& colorSenRotate = colorR;
         
         while(true) {
-            if(debugLocal == Debug::Packet)
-                packetColorReflected();
-
+        //     if(debugLocal == Debug::Packet)
+        //         packetColorReflected();
             if(btnStop.isPressed()) {
                 motors.off(false);
                 ev3cxx::statusLight.setColor(ev3cxx::StatusLightColor::RED);
@@ -358,38 +314,15 @@ public:
             //      && errorPos < errorPosThreshold) {
             // }
             if(dir == Direction::Left) {
-                if(debugLocal & Debug::Text) {
-                    format(bt, "<=== Direction::Left %3 : %3  r:%4 d:%4\n") 
-                        % colorL.reflected() % colorR.reflected()
-                        % rotateSensorDistance % motors.leftMotor().degrees();
-                }
-
                 if(rotateSensorDistance < motors.rightMotor().degrees()) {
                     if(colorL.reflected() < rotateSensorThreshold) {
-                        if(debugLocal & Debug::Text) {
-                            format(bt, "<=== Dir::Left %3 : %3  r:%4 d:%4\n") 
-                                % colorL.reflected() % colorR.reflected()
-                                % rotateSensorDistance % motors.leftMotor().degrees();
-                        }
-                        
                         motors.off(true);
                          return State::PositionReached;
                     }
                 }
             } else {
-                if(debugLocal & Debug::Text) {
-                    format(bt, "<=== Direction::Right %3 : %3  r:%4 d:%4\n") 
-                        % colorL.reflected() % colorR.reflected()
-                        % rotateSensorDistance % motors.leftMotor().degrees();
-                }
-                
                 if(rotateSensorDistance < motors.leftMotor().degrees()) {
                     if(colorR.reflected() < rotateSensorThreshold) {
-                        if(debugLocal & Debug::Text) {
-                            format(bt, "<=== Dir::Right %3 : %3  r:%4 d:%4\n") 
-                                % colorL.reflected() % colorR.reflected()
-                                % rotateSensorDistance % motors.leftMotor().degrees();
-                        }
                         motors.off(true);
                         return State::PositionReached;
                     }
@@ -412,6 +345,7 @@ public:
 
     ev3cxx::MotorTank& motors;
 
+    Logger& log;
     ev3cxx::Bluetooth& bt;
 
     int speedStart;

@@ -9,6 +9,7 @@
 #include <string>
 #include <fstream>
 #include <streambuf>
+#include <functional>
 
 #include "ev3cxx.h"
 #include "app.h"
@@ -19,12 +20,13 @@
 
 #include "json11.hpp"
 
-#include "Robot.h"
-#include "Detector.h"
 #include "libs/logging/logging.hpp"
 #include "libs/logging/FileLogSink.h"
 #include "libs/logging/DisplayLogSink.h"
 #include "libs/logging/BTLogSink.h"
+
+#include "Robot.h"
+#include "Detector.h"
 
 
 using ev3cxx::display;
@@ -48,11 +50,13 @@ int getCalibratedValue(int val, int vMin, int vMax, int min, int max, bool clamp
     return result;
 }
 
-void waitForSomething(ev3cxx::BrickButton& btn, ev3cxx::Bluetooth& bt, std::string msg, bool skip = false) {
+void waitForButton(ev3cxx::BrickButton& btn, Logger& l, std::string msg, bool skip = false,
+                   std::function<void()> idleTask = []{}) 
+{
     if(!skip) {
-        display.format("% ") % msg;
-        format(bt,"% ") % msg;
+         l.logInfo("INFO", "{}") << msg;
         while(!btn.isPressed()) {
+            idleTask();
             ev3cxx::delayMs(10);
         }
     }
@@ -99,7 +103,7 @@ void main_task(intptr_t unused) {
     ev3cxx::Motor motorL{ev3cxx::MotorPort::B};
     ev3cxx::Motor motorR{ev3cxx::MotorPort::C};
     ev3cxx::MotorTank motors{ev3cxx::MotorPort::B, ev3cxx::MotorPort::C};
-
+    
     Logger l;
     l.addSink(ALL, std::unique_ptr<LogSink>(new FileLogSink("log.txt", 80)));
     l.addSink(ALL, std::unique_ptr<LogSink>(new DisplayLogSink(display, 15, 16)));
@@ -108,37 +112,22 @@ void main_task(intptr_t unused) {
     json11::Json config = load_config("config.json");
     display_intro(config, display);
 
-    display.setFont(EV3_FONT_SMALL);
-    display.format(" \n Press ENTER to begin\n");
-    display.setFont(EV3_FONT_MEDIUM);
-    
-    while(!btnEnter.isPressed()) {
-        ev3cxx::delayMs(10);
-    }
-    
     char welcomeString[] = "\r\tK-ranka 2021\nev3cxx-ketchup\nInitialization...\n";
-    format(bt, "\n\n% ") % welcomeString;
-    display.format("% ") % welcomeString;
+    
+    l.logInfo("INFO", "{}") << welcomeString;
     Robot robot{robotGeometry, colorL, colorR, touchStop, btnEnter, btnStop, motors, 
-        bt, Robot::Debug(Robot::Debug::Text | Robot::Debug::Packet)};
+        l, bt, Robot::Debug(Robot::Debug::Text | Robot::Debug::Packet)};
     robot.init();
 
-    waitForSomething(btnEnter, bt, "Cal => ENTER\n", true);
+    waitForButton(btnEnter, l, "Cal => ENTER\n", false);
+    display.resetScreen();
     robot.calibrateSensor();
 
     while(true) {
-        //waitForSomething(btnEnter, bt, "Start => ENTER\n", false);
-        bool skip = false;
-        std::string msg = "Start => ENTER\n";
-        if(!skip) {
-            display.format("% ") % msg.c_str();
-            format(bt,"% ") % msg.c_str();
-            while(!btnEnter.isPressed()) {
-                if(robot.debugState() & Robot::Debug::Packet)
-                    robot.packetColorReflected();
-                ev3cxx::delayMs(10);
-            }
-        }
+        // waitForButton(btnEnter, l, "Start => ENTER\n", false, [&]{
+        //     if(robot.debugState() & Robot::Debug::Packet)
+        //             robot.packetColorReflected();
+        // });
 
         robot.step(2);
         format(bt, "\n\n\r");

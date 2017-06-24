@@ -111,6 +111,9 @@ public:
         // => If the sensor is not connected then the program freezes
         lineL._sensor.reflected();
         lineR._sensor.reflected();
+
+        motors.onForDegrees(30,30, robotGeometry.distanceToDegrees(200));
+        motors.onForDegrees(20, -20, robotGeometry.rotateDegrees(360));
     }
 
     void calibrateSensor(Debug debugLocal = Debug::Default) {
@@ -119,9 +122,8 @@ public:
 
         motors.leftMotor().resetPosition();
         motors.rightMotor().resetPosition();
-        motors.onForDegrees(10, -10,
-            robotGeometry.distanceDegrees(
-                robotGeometry.rotateDegrees(robotCalibrationDegrees)), true, false);
+        motors.onForDegrees(10, -10, 
+            robotGeometry.rotateDegrees(robotCalibrationDegrees), true, false);
 
         while((motors.leftMotor().degrees() < (robotCalibrationDegrees - 10)) &&
               (motors.rightMotor().degrees() < (robotCalibrationDegrees - 10)))
@@ -164,7 +166,7 @@ public:
             else if ( !ketchupSensor.isPressed() ) {
                 motors.leftMotor().resetPosition();
                 motors.rightMotor().resetPosition();
-                while ( motors.leftMotor().degrees() < robotGeometry.distanceDegrees(70)) {
+                while ( motors.leftMotor().degrees() < robotGeometry.distanceToDegrees(70)) {
                     if( btnStop.isPressed() ) {
                         ev3cxx::statusLight.setColor( ev3cxx::StatusLightColor::RED );
                         return State::StopBtnPressed;
@@ -196,7 +198,7 @@ public:
         motors.leftMotor().resetPosition();
         motors.rightMotor().resetPosition();
         motors.on( forwardSpeed, forwardSpeed );
-        while ( motors.leftMotor().degrees() < robotGeometry.distanceDegrees(70)) {
+        while ( motors.leftMotor().degrees() < robotGeometry.distanceToDegrees(70)) {
             if( btnStop.isPressed() ) {
                 ev3cxx::statusLight.setColor( ev3cxx::StatusLightColor::RED );
                 return State::StopBtnPressed;

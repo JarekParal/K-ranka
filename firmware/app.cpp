@@ -131,13 +131,10 @@ void main_task(intptr_t unused) {
     waitForButton(btnEnter, l, "Cal => ENTER\n", false);
     display.resetScreen();
     robot.calibrateSensor();
-    waitForButton(btnEnter, l, "Run => ENTER\n", false );
-
 
     while(true) {
+        waitForButton(btnEnter, l, "Run => ENTER\n", false);
         robot.step(2);
         motors.off(false);
-        while ( true )
-            ev3cxx::delayMs( 1000 );
     }
 }

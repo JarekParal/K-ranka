@@ -97,7 +97,7 @@ void main_task(intptr_t unused) {
 
     ev3cxx::ColorSensor colorL{ev3cxx::SensorPort::S1};
     ev3cxx::ColorSensor colorR{ev3cxx::SensorPort::S4};
-    ev3cxx::TouchSensor touchStop{ev3cxx::SensorPort::S3};
+    ev3cxx::TouchSensor ketchupSensor{ev3cxx::SensorPort::S3};
     ev3cxx::BrickButton btnEnter(ev3cxx::BrickButtons::ENTER);
     ev3cxx::BrickButton btnStop(ev3cxx::BrickButtons::UP);
 
@@ -124,7 +124,7 @@ void main_task(intptr_t unused) {
     char welcomeString[] = "\r\tK-ranka 2021\nev3cxx-ketchup\nInitialization...\n";
     format(bt, "\n\n% ") % welcomeString;
     display.format("% ") % welcomeString;
-    Robot robot{robotGeometry, colorL, colorR, touchStop, btnEnter, btnStop, motors,
+    Robot robot{robotGeometry, colorL, colorR, ketchupSensor, btnEnter, btnStop, motors,
         l, bt, Robot::Debug(Robot::Debug::Text | Robot::Debug::Packet)};
     robot.init();
 
@@ -135,11 +135,9 @@ void main_task(intptr_t unused) {
 
 
     while(true) {
-        for(int i = 0; i < 2; i++) {
-            robot.step(1);
-            robot.rotate(-90);
-            ev3cxx::delayMs(1);
-        }
+        robot.step(2);
         motors.off(false);
+        while ( true )
+            ev3cxx::delayMs( 1000 );
     }
 }

@@ -16,7 +16,7 @@
 
 #define ATOMS_NO_EXCEPTION
 #include <atoms/communication/avakar.h>
-#include <atoms/numeric/rolling_average.h> 
+#include <atoms/numeric/rolling_average.h>
 
 #include "json11.hpp"
 
@@ -28,6 +28,7 @@
 #include "Robot.h"
 #include "Detector.h"
 
+extern "C" void __sync_synchronize() {};
 
 using ev3cxx::display;
 using ev3cxx::format;
@@ -40,7 +41,7 @@ void calibrateSensor(int val, int& min, int& max) {
 }
 
 int getCalibratedValue(int val, int vMin, int vMax, int min, int max, bool clamp = false) {
-    int result = ((val - vMin) * (float(max - min) / (vMax - vMin))) + min; 
+    int result = ((val - vMin) * (float(max - min) / (vMax - vMin))) + min;
     if(clamp) {
         if(min > result)
             return min;
@@ -51,7 +52,7 @@ int getCalibratedValue(int val, int vMin, int vMax, int min, int max, bool clamp
 }
 
 void waitForButton(ev3cxx::BrickButton& btn, Logger& l, std::string msg, bool skip = false,
-                   std::function<void()> idleTask = []{}) 
+                   std::function<void()> idleTask = []{})
 {
     if(!skip) {
          l.logInfo("INFO", "{}") << msg;
@@ -83,7 +84,7 @@ json11::Json load_config(std::string fileName){
     std::ifstream configFile(fileName);
     std::string configJson((std::istreambuf_iterator<char>(configFile)),
                  std::istreambuf_iterator<char>());
-    
+
     std::string ErrorMsg = std::string("Json parsing error");
     return json11::Json::parse(configJson, ErrorMsg);
 }
@@ -103,7 +104,7 @@ void main_task(intptr_t unused) {
     ev3cxx::Motor motorL{ev3cxx::MotorPort::B};
     ev3cxx::Motor motorR{ev3cxx::MotorPort::C};
     ev3cxx::MotorTank motors{ev3cxx::MotorPort::B, ev3cxx::MotorPort::C};
-    
+
     Logger l;
     l.addSink(ALL, std::unique_ptr<LogSink>(new FileLogSink("log.txt", 80)));
     l.addSink(ALL, std::unique_ptr<LogSink>(new DisplayLogSink(display, 15, 16)));
@@ -112,33 +113,32 @@ void main_task(intptr_t unused) {
     json11::Json config = load_config("config.json");
     display_intro(config, display);
 
+    display.setFont(EV3_FONT_SMALL);
+    display.format(" \n Press ENTER to begin\n");
+    display.setFont(EV3_FONT_MEDIUM);
+
+    while(!btnEnter.isPressed()) {
+        ev3cxx::delayMs(10);
+    }
+
     char welcomeString[] = "\r\tK-ranka 2021\nev3cxx-ketchup\nInitialization...\n";
-    
-    l.logInfo("INFO", "{}") << welcomeString;
-    Robot robot{robotGeometry, colorL, colorR, touchStop, btnEnter, btnStop, motors, 
+    format(bt, "\n\n% ") % welcomeString;
+    display.format("% ") % welcomeString;
+    Robot robot{robotGeometry, colorL, colorR, touchStop, btnEnter, btnStop, motors,
         l, bt, Robot::Debug(Robot::Debug::Text | Robot::Debug::Packet)};
     robot.init();
 
     waitForButton(btnEnter, l, "Cal => ENTER\n", false);
     display.resetScreen();
     robot.calibrateSensor();
+    waitForButton(btnEnter, l, "Run => ENTER\n", false );
+
 
     while(true) {
-        // waitForButton(btnEnter, l, "Start => ENTER\n", false, [&]{
-        //     if(robot.debugState() & Robot::Debug::Packet)
-        //             robot.packetColorReflected();
-        // });
-
-        robot.step(2);
-        format(bt, "\n\n\r");
-        
         for(int i = 0; i < 2; i++) {
-            robot.rotate(-90);//, robot.Debug::Text + robot.Debug::Packet);
             robot.step(1);
             robot.rotate(-90);
-            robot.step(1);
-            robot.rotate(-90);
-            robot.step(1);
+            ev3cxx::delayMs(1);
         }
         motors.off(false);
     }

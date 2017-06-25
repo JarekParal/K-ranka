@@ -6,15 +6,16 @@
 #include <array>
 #include <initializer_list>
 #include <algorithm>
+#include <vector>
 
 namespace atoms {
 
 template <class T, size_t SIZE>
 class RollingAverage {
 public:
-    RollingAverage() : sum(0), index(0)
+    RollingAverage() : values( SIZE, T( 0 ) ), sum(0), index(0)
     {
-        std::fill(values.begin(), values.end(), T(0));
+        // std::fill(values.begin(), values.end(), T(0));
     };
 
     void push(const T& t) {
@@ -37,9 +38,9 @@ public:
         std::fill(values.begin(), values.end(), t);
         sum = t * SIZE;
     }
-    
+
 private:
-    std::array<T, SIZE> values;
+    std::vector< T > values;
     T sum;
     size_t index;
 };

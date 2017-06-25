@@ -10,6 +10,7 @@
 #include <fstream>
 #include <streambuf>
 #include <functional>
+#include <memory>
 
 #include "ev3cxx.h"
 #include "app.h"
@@ -93,7 +94,7 @@ json11::Json load_config(std::string fileName){
 char welcomeString[] = "\r\tK-ranka 2017\nev3cxx-ketchup\nInitialization...\n";
 
 void main_task(intptr_t unused) {
-    //Robot.Debug debugInfo = Robot.Debug::No;
+    //robot->Debug debugInfo = robot->Debug::No;
     RobotGeometry robotGeometry{55, 125};
 
     ev3cxx::statusLight.setColor(ev3cxx::StatusLightColor::ORANGE);
@@ -128,9 +129,9 @@ void main_task(intptr_t unused) {
     // display.format("% ") % welcomeString;
     l.logInfo("INFO", "{}") << welcomeString;
 
-    Robot robot{robotGeometry, colorL, colorR, ketchupSensor, btnEnter, btnStop, motors, motorGate,
-        l, bt, sonar, Robot::Debug(Robot::Debug::Text | Robot::Debug::Packet)};
-    robot.ledRed();
+    auto robot = std::make_unique< Robot >(robotGeometry, colorL, colorR, ketchupSensor, btnEnter, btnStop, motors, motorGate,
+        l, bt, sonar, Robot::Debug(Robot::Debug::Text | Robot::Debug::Packet));
+    robot->ledRed();
 
     // waitForButton(btnEnter, l, "Testing components", false, [&]{
     //     l.logDebug("TESTING", "ketchupSensor: {}") << ketchupSensor.isPressed();
@@ -141,39 +142,39 @@ void main_task(intptr_t unused) {
         l.logDebug("TESTING", "ketchupSen: {} ", int(ketchupSensor.isPressed()));
         ev3cxx::delayMs(200);
         if(!ketchupSensor.isPressed())
-            robot.ledOrange();
+            robot->ledOrange();
         else
-            robot.ledGreen();
+            robot->ledGreen();
     }
-    robot.ledRed();
+    robot->ledRed();
 
     l.logInfo("ROBOT", "init() - start");
-    robot.init();
+    robot->init();
     l.logInfo("ROBOT", "init() - end");
 
     //l.logInfo("ROBOT", "calibrate() - start");
-    robot.calibrateSensor();
+    robot->calibrateSensor();
     //l.logInfo("ROBOT", "calibrate() - end");
 
-    robot.ledGreen();
+    robot->ledGreen();
     Robot::State robotState;
     //int tinCnt = 0;
 
     while(true) {
         waitForButton(btnEnter, l, "Run => ENTER", false);
-        robotState = robot.step(1);
+        robotState = robot->step(1);
         l.logInfo("MOVE", "step() => {}") << int(robotState);
         //l.logInfo("MOVE", "step() => {}") << Robot::StateStr[int(robotState)];
         // if(robotState == Robot::State::KetchupDetected) {
         //     tinCnt++;
         // }
         // if(tinCnt == 1) {
-        //     robot.gateOpen();
+        //     robot->gateOpen();
         //     break;
         // }
+        motors.off(false);
     }
 
-    motors.off(false);
-    robot.rotate( 90 );
+    robot->rotate( 90 );
     motors.off(true);
 }

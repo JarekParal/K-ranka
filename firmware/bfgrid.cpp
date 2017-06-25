@@ -39,10 +39,10 @@ void relax( DestMap& map, Position p, const std::set< Position >& forbid ) {
     if ( forbid.find( p ) != forbid.end() )
         return;
     auto candidates = {
-        std::make_pair( Position{ p.x + 1, p.y }, Pred::East ),
-        std::make_pair( Position{ p.x - 1, p.y }, Pred::West ),
         std::make_pair( Position{ p.x, p.y + 1 }, Pred::North ),
-        std::make_pair( Position{ p.x, p.y - 1 }, Pred::South )
+        std::make_pair( Position{ p.x, p.y - 1 }, Pred::South ),
+        std::make_pair( Position{ p.x + 1, p.y }, Pred::East ),
+        std::make_pair( Position{ p.x - 1, p.y }, Pred::West )
     };
     for ( auto neighbour : candidates ) {
         auto n = neighbour.first;
@@ -99,8 +99,40 @@ std::string visualizeDestMap( const DestMap& map ) {
             default:
                 line += 'X';
             }
+            line += ' ';
         }
         res = line + '\n' + res;
     }
     return res;
+}
+
+Pred invert( Pred p ) {
+    int val = static_cast< int >( p );
+    val += 6;
+    return static_cast< Pred >( val % 4 );
+}
+
+std::ostream& operator<<( std::ostream& o , Position p ) {
+    o << "[" << p.x << ", " << p.y << "]";
+    return o;
+}
+
+std::ostream& operator<<( std::ostream& o, Pred p ) {
+    switch( p ) {
+        case Pred::East:
+            o << "East";
+            break;
+        case Pred::North:
+            o << "North";
+            break;
+        case Pred::West:
+            o << "West";
+            break;
+        case Pred::South:
+            o << "South";
+            break;
+        default:
+            o << "None";
+    }
+    return o;
 }

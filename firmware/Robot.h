@@ -180,7 +180,7 @@ public:
     }
 
     void gateInit() {
-        motorGate.on(-20);
+        gateClose();
         ev3cxx::delayMs(500);
     }
 
@@ -190,15 +190,16 @@ public:
 
     void gateOpen() {
         const float gatePositionOpen = 0.26;
-        motorGate.resetPosition();
-        motorGate.onForRotations(-20, gatePositionOpen, true, false);
+        // motorGate.resetPosition();
+        // motorGate.onForRotations(-20, gatePositionOpen, true, false);
+        motorGate.on(20);
     }
 
     void gateClose() {
         const float gatePositionClose = 0.26;
-        motorGate.resetPosition();
-        motorGate.onForRotations(20, gatePositionClose, true, false);
-
+        // motorGate.resetPosition();
+        // motorGate.onForRotations(20, gatePositionClose, true, false);
+        motorGate.on(-20);
     }
 
     void calibrateSensor(Debug debugLocal = Debug::Default) {

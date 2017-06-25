@@ -57,14 +57,14 @@ public:
     }
 
     // Current object support command
-    template <class T, class S = Object>    
+    template <class T, class S = Object>
     void set_command(const T& command, typename std::enable_if_t<has_member_set_command<S>::value>* = nullptr)
     {
         Object::set_command(Base::buffer + OFFSET, command);
     }
 
     // Current object doesn't support command
-    template <class T, class S = Object> 
+    template <class T, class S = Object>
     void set_command(const T& command, typename std::enable_if_t<!has_member_set_command<S>::value>* = nullptr)
     {
         Parent::set_command(command);
@@ -160,7 +160,7 @@ public:
         }
         return Object::push_byte(c, Base::buffer + OFFSET, Base::counter, size);
     }
-    
+
     bool prepare(size_t count, size_t size) {
         if (count != 0)
             return Parent::prepare(count - 1, size);
@@ -296,7 +296,7 @@ struct Static {
             counter++;
         return counter == static_size;
     }
-    
+
     static bool prepare(size_t) {
         return false;
     }
@@ -334,7 +334,7 @@ struct Command {
         counter++;
         return counter == static_size;
     }
-    
+
     static bool prepare(size_t) {
         return false;
     }
@@ -367,7 +367,7 @@ struct Address {
         counter++;
         return counter == static_size;
     }
-    
+
     static bool prepare(size_t) {
         return false;
     }
@@ -403,7 +403,7 @@ struct Size {
         counter++;
         return counter == static_size;
     }
-    
+
     static bool prepare(size_t) {
         return false;
     }
@@ -437,7 +437,7 @@ struct BoundedData {
         counter++;
         return counter == size;
     }
-    
+
     static bool prepare(size_t size) {
         return size == 0;
     }

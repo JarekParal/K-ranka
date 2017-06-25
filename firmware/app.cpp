@@ -100,9 +100,9 @@ void main_task(intptr_t unused) {
 
     ev3cxx::Bluetooth bt{true};
     Logger l;
-    l.addSink(ALL, std::unique_ptr<LogSink>(new FileLogSink("log.txt", 80)));
+    //l.addSink(ALL, std::unique_ptr<LogSink>(new FileLogSink("log.txt", 80)));
     l.addSink(ALL, std::unique_ptr<LogSink>(new DisplayLogSink(display, 15, 16)));
-    l.addSink(ALL, std::unique_ptr<LogSink>(new BTLogSink(bt, 80)));
+    //l.addSink(ALL, std::unique_ptr<LogSink>(new BTLogSink(bt, 80)));
 
     ev3cxx::ColorSensor colorL{ev3cxx::SensorPort::S1};
     l.logInfo("Sensor", "colorL - init");
@@ -151,21 +151,29 @@ void main_task(intptr_t unused) {
     robot.init();
     l.logInfo("ROBOT", "init() - end");
 
+    //l.logInfo("ROBOT", "calibrate() - start");
     robot.calibrateSensor();
+    //l.logInfo("ROBOT", "calibrate() - end");
 
     robot.ledGreen();
-
     Robot::State robotState;
+    //int tinCnt = 0;
 
     while(true) {
         waitForButton(btnEnter, l, "Run => ENTER", false);
         robotState = robot.step(1);
         l.logInfo("MOVE", "step() => {}") << int(robotState);
         //l.logInfo("MOVE", "step() => {}") << Robot::StateStr[int(robotState)];
-        if(robotState == Robot::State::RivalDetected) {
-            motors.off(true);
-            robot.rotate( 90 );
-        }
-        motors.off(false);
+        // if(robotState == Robot::State::KetchupDetected) {
+        //     tinCnt++;
+        // }
+        // if(tinCnt == 1) {
+        //     robot.gateOpen();
+        //     break;
+        // }
     }
+
+    motors.off(false);
+    robot.rotate( 90 );
+    motors.off(true);
 }

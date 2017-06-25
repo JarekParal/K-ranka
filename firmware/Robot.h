@@ -68,6 +68,30 @@ void packet_send_motors_line(ev3cxx::Bluetooth & bt, int motorLSpeed, int motorR
     packetOut.clear();
 }
 
+void beepVolume(int vol) {
+    ev3_speaker_set_volume(vol);
+}
+
+void beep(unsigned frequency, int durationMs = 500) {
+    ev3_speaker_play_tone(frequency, durationMs);
+}
+
+void beepTest() {
+    for(int i = 0; i <= 5; ++i) {
+        beepVolume(20*i);
+        beep(100, 500);
+        ev3cxx::delayMs(500);
+    }
+
+    for(int frec = 1; frec < 30; ++frec) {
+        for(int i = 0; i <= 5; ++i) {
+            beepVolume(20*i);
+            beep(500*frec, 500);
+            ev3cxx::delayMs(500);
+        }
+    }
+}
+
 class Robot {
 public:
     enum class State {
@@ -75,6 +99,12 @@ public:
         KetchupDetected,
         RivalDetected,
     };
+
+    // static std::string const StateStr[3] = {
+    //     "PositionReached",
+    //     "KetchupDetected",
+    //     "RivalDetected"
+    // };
 
     enum Debug {
         No = 1 << 0,
@@ -90,22 +120,36 @@ public:
     };
 
     Robot(RobotGeometry& rGeometry, ev3cxx::ColorSensor& ColorL, ev3cxx::ColorSensor& ColorR, ev3cxx::TouchSensor& TouchStop,
-    ev3cxx::BrickButton& BtnEnter, ev3cxx::BrickButton& BtnStop, ev3cxx::MotorTank& Motors,
-    Logger& Log, ev3cxx::Bluetooth& Bt, Debug DebugGlobal = Debug::No)
+    ev3cxx::BrickButton& BtnEnter, ev3cxx::BrickButton& BtnStop, ev3cxx::MotorTank& Motors, ev3cxx::Motor& MotorGate,
+    Logger& Log, ev3cxx::Bluetooth& Bt, ev3cxx::UltrasonicSensor& sonar, Debug DebugGlobal = Debug::No)
     : robotGeometry(rGeometry),
     lineL(ColorL), lineR(ColorR), ketchupSensor(TouchStop), btnEnter(BtnEnter), btnStop(BtnStop),
-    motors(Motors), log(Log), bt(Bt),
+    motors(Motors), motorGate(MotorGate), log(Log), bt(Bt),
     forwardSpeed(20),
     distanceTargetDiff(100),
     errorPosThreshold(100),
     rotateSensorThreshold(30),
     rotateSensorDistanceDiff(170),
-    debugGlobal(DebugGlobal)
+    debugGlobal(DebugGlobal),
+    sonar(sonar)
     {}
 
     void debugCheckGlobal(Debug& local) {
         if(local == Debug::Default)
             local = debugGlobal;
+    }
+
+    void exit(int exitCode) {
+        log.logWarning("EXIT", "exit()");
+        ledRed();
+        motorsBrake();
+        ev3cxx::delayMs(500);
+        std::exit(exitCode);
+    }
+
+    void motorsBrake(bool brake = false) {
+        motors.off(brake);
+        motorGate.off(brake);
     }
 
     void init() {
@@ -114,6 +158,47 @@ public:
         // => If the sensor is not connected then the program freezes
         lineL._sensor.reflected();
         lineR._sensor.reflected();
+        gateInit();
+        gateBrake();
+    }
+
+
+    void ledOff() {
+        ev3cxx::statusLight.setColor(ev3cxx::StatusLightColor::OFF);
+    }
+
+    void ledRed() {
+        ev3cxx::statusLight.setColor(ev3cxx::StatusLightColor::RED);
+    }
+
+    void ledGreen() {
+        ev3cxx::statusLight.setColor(ev3cxx::StatusLightColor::GREEN);
+    }
+
+    void ledOrange() {
+        ev3cxx::statusLight.setColor(ev3cxx::StatusLightColor::ORANGE);
+    }
+
+    void gateInit() {
+        motorGate.on(-20);
+        ev3cxx::delayMs(500);
+    }
+
+    void gateBrake() {
+        motorGate.off(true);
+    }
+
+    void gateOpen() {
+        const float gatePositionOpen = 0.26;
+        motorGate.resetPosition();
+        motorGate.onForRotations(-20, gatePositionOpen, true, false);
+    }
+
+    void gateClose() {
+        const float gatePositionClose = 0.26;
+        motorGate.resetPosition();
+        motorGate.onForRotations(20, gatePositionClose, true, false);
+
     }
 
     void calibrateSensor(Debug debugLocal = Debug::Default) {
@@ -134,6 +219,10 @@ public:
         motors.off(false);
     }
 
+    bool enemyDetected() {
+        return sonar.centimeters() < 20;
+    }
+
     std::pair< int, int > lineError() {
         int l = lineL.reflectedFast();
         int r = lineR.reflectedFast();;
@@ -150,9 +239,10 @@ public:
         while( motors.leftMotor().degrees() < distanceDeg &&
                motors.rightMotor().degrees() < distanceDeg )
         {
-            if ( btnStop.isPressed() ) {
-                std::exit( 1 );
-            }
+            if ( btnStop.isPressed() )
+                exit( 1 );
+            if ( enemyDetected() )
+                return State::RivalDetected;
             ev3cxx::delayMs( 5 );
         }
         return State::PositionReached;
@@ -171,7 +261,7 @@ public:
                motors.rightMotor().degrees() < distanceDeg )
         {
             if ( btnStop.isPressed() ) {
-                std::exit( 1 );
+                exit( 1 );
             }
              ev3cxx::delayMs(5);
         }
@@ -196,7 +286,7 @@ public:
             int motorRSpeed = forwardSpeed - speedGain;
 
             if ( btnStop.isPressed() ) {
-                std::exit( 1 );
+                exit( 1 );
             }
             if ( motors.leftMotor().degrees() > target && errorPos < errorPosThreshold ) {
                 ev3cxx::statusLight.setColor( ev3cxx::StatusLightColor::ORANGE );
@@ -212,6 +302,8 @@ public:
                 auto s = _moveForward( 25 );
                 return std::max( State::KetchupDetected, s );
             }
+            if ( enemyDetected() )
+                return State::RivalDetected;
 
             motors.on( motorRSpeed, motorLSpeed );
             ev3cxx::delayMs(5);
@@ -246,7 +338,7 @@ public:
               lineR.reflectedSlow() > rotateSensorThreshold)
         {
            if ( btnStop.isPressed() )
-                std::exit( 1 );
+                exit( 1 );
             ev3cxx::delayMs(1);
         }
 
@@ -269,6 +361,7 @@ public:
     ev3cxx::BrickButton& btnStop;
 
     ev3cxx::MotorTank& motors;
+    ev3cxx::Motor& motorGate;
 
     Logger& log;
     ev3cxx::Bluetooth& bt;
@@ -279,4 +372,6 @@ public:
     int rotateSensorThreshold;
     int rotateSensorDistanceDiff;
     Debug debugGlobal;
+
+    ev3cxx::UltrasonicSensor& sonar;
 };

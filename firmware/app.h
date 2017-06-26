@@ -84,9 +84,10 @@ extern "C" {
 /**
  * Default task stack size in bytes
  */
-#ifndef STACK_SIZE
-#define	STACK_SIZE 8096
+#ifdef STACK_SIZE
+#undef STACK_SIZE
 #endif
+#define	STACK_SIZE 16192
 
 /**
  * Prototypes for configuration

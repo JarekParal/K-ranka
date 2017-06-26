@@ -28,6 +28,7 @@
 
 #include "Robot.h"
 #include "Detector.h"
+#include "ketchup.hpp"
 
 extern "C" void __sync_synchronize() {};
 
@@ -90,7 +91,7 @@ json11::Json load_config(std::string fileName){
     return json11::Json::parse(configJson, ErrorMsg);
 }
 
-
+Logger l;
 char welcomeString[] = "\r\tK-ranka 2017\nev3cxx-ketchup\nInitialization...\n";
 
 void main_task(intptr_t unused) {
@@ -100,7 +101,6 @@ void main_task(intptr_t unused) {
     ev3cxx::statusLight.setColor(ev3cxx::StatusLightColor::ORANGE);
 
     ev3cxx::Bluetooth bt{true};
-    Logger l;
     //l.addSink(ALL, std::unique_ptr<LogSink>(new FileLogSink("log.txt", 80)));
     l.addSink(ALL, std::unique_ptr<LogSink>(new DisplayLogSink(display, 15, 16)));
     //l.addSink(ALL, std::unique_ptr<LogSink>(new BTLogSink(bt, 80)));
@@ -131,6 +131,7 @@ void main_task(intptr_t unused) {
 
     auto robot = std::make_unique< Robot >(robotGeometry, colorL, colorR, ketchupSensor, btnEnter, btnStop, motors, motorGate,
         l, bt, sonar, Robot::Debug(Robot::Debug::Text | Robot::Debug::Packet));
+    auto controller = std::make_unique< KetchupLogic >( *robot );
     robot->ledRed();
 
     // waitForButton(btnEnter, l, "Testing components", false, [&]{
@@ -138,6 +139,15 @@ void main_task(intptr_t unused) {
     //     ev3cxx::delayMs(50);
     // });
 
+    ev3cxx::delayMs( 2000 );
+
+    l.logInfo("ROBOT", "init() - start");
+    robot->init();
+    l.logInfo("ROBOT", "init() - end");
+
+    //l.logInfo("ROBOT", "calibrate() - start");
+    robot->calibrateSensor();
+    //l.logInfo("ROBOT", "calibrate() - end");
     while(!btnEnter.isPressed()) {
         l.logDebug("TESTING", "ketchupSen: {} ", int(ketchupSensor.isPressed()));
         ev3cxx::delayMs(200);
@@ -147,22 +157,16 @@ void main_task(intptr_t unused) {
             robot->ledGreen();
     }
     robot->ledRed();
-
-    l.logInfo("ROBOT", "init() - start");
-    robot->init();
-    l.logInfo("ROBOT", "init() - end");
-
-    //l.logInfo("ROBOT", "calibrate() - start");
-    robot->calibrateSensor();
-    //l.logInfo("ROBOT", "calibrate() - end");
+    ev3cxx::delayMs( 1000 );
 
     robot->ledGreen();
     Robot::State robotState;
     //int tinCnt = 0;
 
-    while(true) {
+    while(false) {
         waitForButton(btnEnter, l, "Run => ENTER", false);
         robotState = robot->step(1);
+        robot->rotate( 90 );
         l.logInfo("MOVE", "step() => {}") << int(robotState);
         //l.logInfo("MOVE", "step() => {}") << Robot::StateStr[int(robotState)];
         // if(robotState == Robot::State::KetchupDetected) {
@@ -174,6 +178,12 @@ void main_task(intptr_t unused) {
         // }
         motors.off(false);
     }
+
+    controller->go( { 2, 6 } );
+    controller->go( { 2, 6 } );
+    controller->go( { 2, 1 } );
+    controller->unload();
+
 
     robot->rotate( 90 );
     motors.off(true);

@@ -159,7 +159,7 @@ public:
         lineL._sensor.reflected();
         lineR._sensor.reflected();
         gateInit();
-        gateBrake();
+        brakeGate();
     }
 
 
@@ -180,23 +180,23 @@ public:
     }
 
     void gateInit() {
-        gateClose();
+        closeGate();
         ev3cxx::delayMs(500);
     }
 
-    void gateBrake() {
+    void brakeGate() {
         motorGate.off(true);
     }
 
-    void gateOpen() {
-        const float gatePositionOpen = 0.26;
+    void openGate() {
+        // const float gatePositionOpen = 0.26;
         // motorGate.resetPosition();
         // motorGate.onForRotations(-20, gatePositionOpen, true, false);
         motorGate.on(20);
     }
 
-    void gateClose() {
-        const float gatePositionClose = 0.26;
+    void closeGate() {
+        // const float gatePositionClose = 0.26;
         // motorGate.resetPosition();
         // motorGate.onForRotations(20, gatePositionClose, true, false);
         motorGate.on(-20);
@@ -291,6 +291,7 @@ public:
             }
             if ( motors.leftMotor().degrees() > target && errorPos < errorPosThreshold ) {
                 ev3cxx::statusLight.setColor( ev3cxx::StatusLightColor::ORANGE );
+                beep( 1000, 200 );
                 return State::PositionReached;
             }
             if ( !ketchupSensor.isPressed() ) {
@@ -301,10 +302,13 @@ public:
             }
             if ( ketchupTrigger.get_average() > 0.9 ) {
                 auto s = _moveForward( 25 );
+                beep( 2000, 200 );
                 return std::max( State::KetchupDetected, s );
             }
-            if ( enemyDetected() )
+            if ( enemyDetected() ) {
+                beep( 400, 200 );
                 return State::RivalDetected;
+            }
 
             motors.on( motorRSpeed, motorLSpeed );
             ev3cxx::delayMs(5);

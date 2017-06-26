@@ -1,6 +1,6 @@
-APPL_COBJS += 
+APPL_COBJS +=
 
-APPL_CXXOBJS += json11.o
+APPL_CXXOBJS += json11.o bfgrid.o
 
 SRCLANG := c++
 

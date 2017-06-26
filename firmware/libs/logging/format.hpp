@@ -185,16 +185,16 @@ template < typename T >
 using NumberFortmatter = NumberSprintfFormatter< T >;
 
 template < typename... Args >
-FormatString format( const char *fmt, Args... args ) {
+inline FormatString format( const char *fmt, Args... args ) {
     return std::move( FormatString( fmt ).fillWith( args... ) );
 }
 
-FormatString format( const char *fmt ) {
+inline FormatString format( const char *fmt ) {
     return FormatString( fmt );
 }
 
 template < typename T >
-NumberFortmatter< T > number( T t ) {
+inline NumberFortmatter< T > number( T t ) {
     return NumberSprintfFormatter< T >( t );
 }
 

@@ -181,7 +181,6 @@ public:
 
     void gateInit() {
         closeGate();
-        ev3cxx::delayMs(500);
     }
 
     void brakeGate() {
@@ -193,6 +192,8 @@ public:
         // motorGate.resetPosition();
         // motorGate.onForRotations(-20, gatePositionOpen, true, false);
         motorGate.on(20);
+        ev3cxx::delayMs(1000);
+        brakeGate();
     }
 
     void closeGate() {
@@ -200,6 +201,8 @@ public:
         // motorGate.resetPosition();
         // motorGate.onForRotations(20, gatePositionClose, true, false);
         motorGate.on(-20);
+        ev3cxx::delayMs(1000);
+        brakeGate();
     }
 
     void calibrateSensor(Debug debugLocal = Debug::Default) {

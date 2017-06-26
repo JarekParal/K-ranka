@@ -14,9 +14,10 @@ struct Formatable { };
 template < class T, class U = void >
 struct FmtStr {};
 
-
+#ifndef HACKME_SIMULATOR
 template < >
 struct FmtStr< int > { FMT_CONST( "d" ); };
+#endif
 
 template < >
 struct FmtStr< int8_t > { FMT_CONST( "c" ); };

@@ -16,11 +16,11 @@ public:
 	: m_wheelDiameter(wheelDiameter), m_wheelBase(wheelBase) 
 	{}
 
-	int distanceToDegrees(int distance) {
+	float distanceToDegrees(float distance) {
 		return (distance / (m_wheelDiameter * M_PI)) * 360; 	
 	}
 
-	int rotateDegrees(int degrees) {
+	float rotateDegrees(float degrees) {
 		return distanceToDegrees(((m_wheelBase * M_PI) * degrees) / 360);
 	}
 

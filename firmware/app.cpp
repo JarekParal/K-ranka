@@ -95,8 +95,12 @@ Logger l;
 char welcomeString[] = "\r\tK-ranka 2017\nev3cxx-ketchup\nInitialization...\n";
 
 void main_task(intptr_t unused) {
+    display.resetScreen();
+    display.format(" % \n") % welcomeString;
     //robot->Debug debugInfo = robot->Debug::No;
-    RobotGeometry robotGeometry{55, 125};
+//     RobotGeometry robotGeometry{55, 125};
+     RobotGeometry robotGeometry{55, 125};
+//    RobotGeometry robotGeometry{55, 132};
 
     ev3cxx::statusLight.setColor(ev3cxx::StatusLightColor::ORANGE);
 
@@ -104,33 +108,38 @@ void main_task(intptr_t unused) {
     //l.addSink(ALL, std::unique_ptr<LogSink>(new FileLogSink("log.txt", 80)));
     l.addSink(ALL, std::unique_ptr<LogSink>(new DisplayLogSink(display, 15, 16)));
     //l.addSink(ALL, std::unique_ptr<LogSink>(new BTLogSink(bt, 80)));
+    
 
-    ev3cxx::ColorSensor colorL{ev3cxx::SensorPort::S1};
+    ev3cxx::ColorSensor colorL{ev3cxx::SensorPort::S3};
     l.logInfo("Sensor", "colorL - init");
     ev3cxx::ColorSensor colorR{ev3cxx::SensorPort::S4};
     l.logInfo("Sensor", "colorR - init");
-    ev3cxx::TouchSensor ketchupSensor{ev3cxx::SensorPort::S3};
+    ev3cxx::TouchSensor ketchupSensor{ev3cxx::SensorPort::S2};
     l.logInfo("Sensor", "ketchupS - init");
-    ev3cxx::UltrasonicSensor sonar{ev3cxx::SensorPort::S2};
+    ev3cxx::UltrasonicSensor sonar{ev3cxx::SensorPort::S1};
     l.logInfo("Sensor", "sonar - init");
     ev3cxx::BrickButton btnEnter(ev3cxx::BrickButtons::ENTER);
     ev3cxx::BrickButton btnStop(ev3cxx::BrickButtons::UP);
     l.logInfo("Sensor", "btn - init");
 
-    ev3cxx::Motor motorL{ev3cxx::MotorPort::B};
-    ev3cxx::Motor motorR{ev3cxx::MotorPort::C};
-    ev3cxx::MotorTank motors{ev3cxx::MotorPort::B, ev3cxx::MotorPort::C};
-    ev3cxx::Motor motorGate{ev3cxx::MotorPort::D};
+    ev3cxx::Motor motorL{ev3cxx::MotorPort::D};
+    ev3cxx::Motor motorR{ev3cxx::MotorPort::A};
+    ev3cxx::MotorTank motors{ev3cxx::MotorPort::D, ev3cxx::MotorPort::A};
+    
+    ev3cxx::Motor motorGate{ev3cxx::MotorPort::C};
+
+    ev3cxx::Motor motorSensor{ev3cxx::MotorPort::B, ev3cxx::MotorType::MEDIUM};
+    motorSensor.off();
 
     json11::Json config = load_config("config.json");
-    //display_intro(config, display);
+    display_intro(config, display);
 
     // format(bt, "\n\n% ") % welcomeString;
     // display.format("% ") % welcomeString;
     l.logInfo("INFO", "{}") << welcomeString;
 
     auto robot = std::make_unique< Robot >(robotGeometry, colorL, colorR, ketchupSensor, btnEnter, btnStop, motors, motorGate,
-        l, bt, sonar, Robot::Debug(Robot::Debug::Text | Robot::Debug::Packet));
+        l, bt, sonar, motorSensor, Robot::Debug(Robot::Debug::Text | Robot::Debug::Packet));
     auto controller = std::make_unique< KetchupLogic >( *robot );
     robot->ledRed();
 
@@ -149,7 +158,6 @@ void main_task(intptr_t unused) {
     robot->calibrateSensor();
     //l.logInfo("ROBOT", "calibrate() - end");
     while(!btnEnter.isPressed()) {
-        l.logDebug("TESTING", "ketchupSen: {} ", int(ketchupSensor.isPressed()));
         ev3cxx::delayMs(200);
         if(!ketchupSensor.isPressed())
             robot->ledOrange();
@@ -163,11 +171,16 @@ void main_task(intptr_t unused) {
     Robot::State robotState;
     //int tinCnt = 0;
 
-    while(false) {
-        waitForButton(btnEnter, l, "Run => ENTER", false);
-        robotState = robot->step(1);
-        robot->rotate( 90 );
-        l.logInfo("MOVE", "step() => {}") << int(robotState);
+//    while(true){
+//        robot->rotate(90);
+//        waitForButton(btnEnter, l, "Run => ENTER", false);
+//    }
+
+    // while(false) {
+     waitForButton(btnEnter, l, "Run => ENTER", false);
+        // robotState = robot->step(1);
+        // robot->rotate( 90 );
+        // l.logInfo("MOVE", "step() => {}") << int(robotState);
         //l.logInfo("MOVE", "step() => {}") << Robot::StateStr[int(robotState)];
         // if(robotState == Robot::State::KetchupDetected) {
         //     tinCnt++;
@@ -176,15 +189,18 @@ void main_task(intptr_t unused) {
         //     robot->gateOpen();
         //     break;
         // }
-        motors.off(false);
-    }
+        // motors.off(false);
+    // }
 
-    controller->go( { 2, 6 } );
-    controller->go( { 2, 6 } );
-    controller->go( { 2, 1 } );
-    controller->unload();
+//         controller->go( { 3, 0 } );
+        controller->go( { 2, 6 } );
+        controller->go( { 2, 0 } );
+    // controller->go( { 2, 6 } );
+    // controller->go( { 2, 6 } );
+    // controller->go( { 2, 1 } );
+    // controller->unload();
 
 
-    robot->rotate( 90 );
+    // robot->rotate( 90 );
     motors.off(true);
 }

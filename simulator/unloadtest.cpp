@@ -30,6 +30,9 @@ struct UnloadTest: TestCase {
         controller.go( { 6, 4 } );
         controller.go( { 6, 3 } );
         controller.go( { 2, 4 } );
+
+//        controller.go( { 1, 1 } );
+        controller.unload();
     }
 
     KetchupLogic *ctrl;

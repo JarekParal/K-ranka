@@ -1,3 +1,10 @@
 {
-    "files.insertFinalNewline": true
+    "files.insertFinalNewline": true,
+    "files.associations": {
+        "__functional_03": "cpp",
+        "functional": "cpp",
+        "valarray": "cpp",
+        "__locale": "cpp",
+        "ios": "cpp"
+    }
 }

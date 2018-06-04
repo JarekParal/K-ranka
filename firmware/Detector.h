@@ -66,6 +66,8 @@ class Detector
             int top = topSensor.centimeters();
             int side = topSensor.centimeters();
             
+            return State::Clear;
+
             if (top > collision && side > collision){
                 return State::Clear;
             }

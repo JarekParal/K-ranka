@@ -64,7 +64,7 @@ struct KetchupLogic {
 
     void onKetchup() {
         ketchupCount++;
-        if ( ketchupCount == 1 )
+        if ( ketchupCount == 2 )
             unload();
     }
 
@@ -77,6 +77,7 @@ struct KetchupLogic {
         l.logInfo( "", "Going to unload" );
         Position origin = position;
         go( { 0, lastUnloadPosition } );
+        //TODO: Not working face
         face( Pred::North );
         robot.openGate();
         go( { 0, lastUnloadPosition + 2 } );

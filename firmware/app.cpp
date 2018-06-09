@@ -66,7 +66,6 @@ void waitForButton(ev3cxx::BrickButton& btn, Logger& l, std::string msg, bool sk
 }
 
 void display_intro(json11::Json config, ev3cxx::detail::Display &display){
-    display.resetScreen();
     json11::Json welcome = config["welcome"].object_items();
     display.format("\n \n \n");
     display.format(" % \n") % welcome["robo"].string_value();
@@ -99,8 +98,8 @@ void main_task(intptr_t unused) {
     display.format(" % \n") % welcomeString;
     //robot->Debug debugInfo = robot->Debug::No;
 //     RobotGeometry robotGeometry{55, 125};
-     RobotGeometry robotGeometry{55, 125};
-//    RobotGeometry robotGeometry{55, 132};
+//     RobotGeometry robotGeometry{55, 125};
+    RobotGeometry robotGeometry{55, 132};
 
     ev3cxx::statusLight.setColor(ev3cxx::StatusLightColor::ORANGE);
 
@@ -126,7 +125,7 @@ void main_task(intptr_t unused) {
     ev3cxx::Motor motorR{ev3cxx::MotorPort::A};
     ev3cxx::MotorTank motors{ev3cxx::MotorPort::D, ev3cxx::MotorPort::A};
     
-    ev3cxx::Motor motorGate{ev3cxx::MotorPort::C};
+    ev3cxx::Motor motorGate{ev3cxx::MotorPort::C, ev3cxx::MotorType::MEDIUM};
 
     ev3cxx::Motor motorSensor{ev3cxx::MotorPort::B, ev3cxx::MotorType::MEDIUM};
     motorSensor.off();
@@ -178,6 +177,7 @@ void main_task(intptr_t unused) {
 
     // while(false) {
      waitForButton(btnEnter, l, "Run => ENTER", false);
+//    display.resetScreen();
         // robotState = robot->step(1);
         // robot->rotate( 90 );
         // l.logInfo("MOVE", "step() => {}") << int(robotState);
@@ -193,8 +193,25 @@ void main_task(intptr_t unused) {
     // }
 
 //         controller->go( { 3, 0 } );
-        controller->go( { 2, 6 } );
-        controller->go( { 2, 0 } );
+//        controller->go( { 2, 6 } );
+//        controller->go( { 2, 0 } );
+
+//    controller->go( { 0, 0 } );
+//    controller->go( { 1, 1 } );
+
+	controller->go( { 0, 3 } );
+	controller->go( { 6, 3 } );
+
+
+//	controller->go( { 6, 3 } );
+//	controller->go( { 0, 3 } );
+
+
+//    robot->step();
+//    controller->go( { 1, 2 } );
+//        controller->go( { 3, 3 } );
+//        controller->go( { 3, 0 } );
+//        controller->go( { 3, 6 } );
     // controller->go( { 2, 6 } );
     // controller->go( { 2, 6 } );
     // controller->go( { 2, 1 } );

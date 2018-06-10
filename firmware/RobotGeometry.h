@@ -2,35 +2,46 @@
 #pragma once
 
 #define _USE_MATH_DEFINES
+
 #include <cmath>
 
 #ifndef M_PI
-    #define M_PI 3.14159265358979323846
+#define M_PI 3.14159265358979323846
 #endif
 
-class RobotGeometry {
+class RobotGeometry
+{
 public:
-	typedef float wheelSizeType;
+	typedef int wheelSizeType;
 
-	RobotGeometry(wheelSizeType wheelDiameter, wheelSizeType wheelBase)
-	: m_wheelDiameter(wheelDiameter), m_wheelBase(wheelBase) 
-	{}
 
-	float distanceToDegrees(float distance) {
-		return (distance / (m_wheelDiameter * M_PI)) * 360; 	
+	RobotGeometry( wheelSizeType wheelDiameter, wheelSizeType wheelBase )
+			: m_wheelDiameter( wheelDiameter ), m_wheelBase( wheelBase ) { }
+
+
+	int distanceToDegrees( int distance )
+	{
+		return static_cast<int>(( distance / ( m_wheelDiameter * M_PI ) ) * 360);
 	}
 
-	float rotateDegrees(float degrees) {
-		return distanceToDegrees(((m_wheelBase * M_PI) * degrees) / 360);
+
+	int rotateDegrees( int degrees )
+	{
+		return distanceToDegrees( static_cast<int>(( ( m_wheelBase * M_PI ) * degrees ) / 360) );
 	}
 
-	wheelSizeType wheelDiameter() {
+
+	wheelSizeType wheelDiameter( )
+	{
 		return m_wheelDiameter;
 	}
-	
-	wheelSizeType wheelBase() {
+
+
+	wheelSizeType wheelBase( )
+	{
 		return m_wheelBase;
 	}
+
 
 private:
 	wheelSizeType m_wheelDiameter;

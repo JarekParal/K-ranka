@@ -88,7 +88,7 @@ extern "C" {
 #undef STACK_SIZE
 #endif
 #define	STACK_SIZE 16192
-// #define	STACK_SIZE 21024
+//#define	STACK_SIZE 21024
 
 /**
  * Prototypes for configuration

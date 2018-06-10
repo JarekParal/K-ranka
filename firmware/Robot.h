@@ -157,7 +157,7 @@ public:
 			: robotGeometry( rGeometry ),
 			  lineL( ColorL ), lineR( ColorR ), ketchupSensor( TouchStop ), btnEnter( BtnEnter ), btnStop( BtnStop ),
 			  motors( Motors ), motorGate( MotorGate ), log( Log ), bt( Bt ),
-			  forwardSpeed( 20 ),
+			  forwardSpeed( 23 ),
 			  distanceTargetDiff( 100 ),
 			  errorPosThreshold( 100 ),
 			  rotateSensorThreshold( 30 ),
@@ -420,26 +420,37 @@ public:
 
 	State _rotate( int degrees )
 	{
-		int distanceDeg = robotGeometry.rotateDegrees( degrees );
+		log.logInfo( "DEBUG", "_Deg = {}" ) << degrees;
+		int distanceDeg =  robotGeometry.rotateDegrees( std::abs(degrees) );
+		log.logInfo( "DEBUG", "distanceDeg = {}" ) << distanceDeg;
+
 		motors.leftMotor().resetPosition();
 		motors.rightMotor().resetPosition();
-		if ( degrees > 0 )
-			motors.on( forwardSpeed, -forwardSpeed );
-		else
-			motors.on( -forwardSpeed, forwardSpeed );
+//		int degLeft = motors.leftMotor().degrees();
 
-		while ( motors.leftMotor().degrees() < distanceDeg &&
-		        motors.rightMotor().degrees() < distanceDeg ) {
+//		int degRight = motors.leftMotor().degrees();
+
+		ev3cxx::delayMs( 1 );
+
+		if ( degrees > 0 ) {
+			motors.on( forwardSpeed, -forwardSpeed );
+		} else {
+			motors.on( -forwardSpeed, forwardSpeed );
+		}
+
+		while ( ( motors.leftMotor().degrees() ) < distanceDeg &&
+		        ( motors.rightMotor().degrees() ) < distanceDeg ) {
 			if ( btnStop.isPressed() ) {
 				exit( 1 );
 			}
 			ev3cxx::delayMs( 5 );
 		}
+
 		return State::PositionReached;
 	}
 
 
-	State _step( Debug debugLocal = Debug::Default )
+	State _step( Debug debugLocal = Debug::Default, bool ignoreKetchup = false, int ketchupCount = 0)
 	{
 		int target = robotGeometry.distanceToDegrees( 40 );
 		// int target = robotGeometry.distanceToDegrees( 80 );
@@ -485,7 +496,7 @@ public:
 				ketchupTrigger.push( 0 );
 			}
 			// if ( ketchupTrigger.get_average() > 0.9 ) {
-			if ( ketchupTrigger.get_average() > 0.2 ) {
+			if ( ketchupTrigger.get_average() > 0.2 && !ignoreKetchup && ketchupCount < 2) {
 				motors.off();
 				ev3cxx::delayMs( 100 );
 				openSensorArm();
@@ -493,18 +504,18 @@ public:
 				auto s = _moveForward( 110 );
 				ev3cxx::delayMs( 5 );
 				closeSensorArm();
-				s = _moveBackward( 40 );
+				s = _moveBackward( 50 );
 				motors.off();
-				ev3cxx::delayMs( 1000 );
 
+//				ev3cxx::delayMs( 1000 );
 				findLine();
 				beep( 2000, 200 );
-				ev3cxx::delayMs( 1000 );
+//				ev3cxx::delayMs( 1000 );
 				return std::max( State::KetchupDetected, s );
 			}
 			if ( enemyDetected() ) {
-				 beep( 400, 200 );
-				 return State::RivalDetected;
+				beep( 400, 200 );
+				return State::RivalDetected;
 			}
 			motors.on( motorRSpeed, motorLSpeed );
 			ev3cxx::delayMs( 5 );
@@ -512,13 +523,14 @@ public:
 	}
 
 
-	State step( int numberOfStep, Debug debugLocal = Debug::Default )
+	State step( int numberOfStep, Debug debugLocal = Debug::Default, bool ignoreKetchup = false, int ketchupCount = 0)
 	{
 		State returnState;
 
 		for ( int cntOfStep = 0; cntOfStep < numberOfStep; ++cntOfStep ) {
-			returnState = _step( debugLocal );
+			returnState = _step( debugLocal, ignoreKetchup, ketchupCount );
 			if ( returnState != State::PositionReached && returnState != State::KetchupDetected ) {
+//				motors.off();
 				return returnState;
 			}
 		}
@@ -531,31 +543,37 @@ public:
 		}
 
 		ev3cxx::statusLight.setColor( ev3cxx::StatusLightColor::RED );
+
+//		motors.off();
 		return std::max( returnState, s );
 	}
 
 
 	//Dotáčet se podle čáry
-	State rotate( int degrees, Debug debugLocal = Debug::Default )
+	State rotate( const int degrees, Debug debugLocal = Debug::Default )
 	{
 //		display.resetScreen();
 		ev3cxx::statusLight.setColor( ev3cxx::StatusLightColor::GREEN );
 		lineL._aSlow.clear( 100 );
 		lineR._aSlow.clear( 100 );
 
-		int odoDeg = sgn( degrees ) * ( abs( degrees ) - 40 );
-		log.logInfo("DEBUG", "odd {}") << odoDeg;
+		const int odoDeg = sgn( degrees ) * ( std::abs( degrees ) - 40 );
+		log.logInfo( "DEBUG", "odd {}" ) << sgn( degrees ) * ( std::abs( degrees ) - 40 );
 		_rotate( odoDeg );
+
+
+		motors.off();
+		ev3cxx::delayMs(10);
+		ev3cxx::statusLight.setColor( ev3cxx::StatusLightColor::RED );
 
 //		LineSensor* crossS = nullptr;
 		if ( degrees > 0 ) {
-			motors.on( 10, -10 );
+			motors.on( 15, -15 );
 		} else {
-			motors.on( -10, 10 );
+			motors.on( -15, 15 );
 		}
 
 
-		ev3cxx::statusLight.setColor( ev3cxx::StatusLightColor::RED );
 		while ( lineL.reflectedSlow() > rotateSensorThreshold &&
 		        lineR.reflectedSlow() > rotateSensorThreshold ) {
 			if ( btnStop.isPressed() )
@@ -581,7 +599,8 @@ public:
 //		}
 
 		ev3cxx::statusLight.setColor( ev3cxx::StatusLightColor::GREEN );
-		_rotate( sgn( degrees ) * 5 );
+
+		_rotate( sgn( degrees ) * 3 );
 
 		motors.off();
 		return State::PositionReached;

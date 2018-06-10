@@ -9,7 +9,7 @@ namespace {
 int distance( DestMap& map, Position via, Position to ) {
     int dx = via.x - to.x;
     int dy = via.y - to.y;
-    assert( abs( dx ) + abs( dy ) == 1 );
+    assert( std::abs( dx ) + std::abs( dy ) == 1 );
 
     auto& viaD = map[ via ];
 
@@ -62,6 +62,15 @@ void relax( DestMap& map, Position p, const std::set< Position >& forbid ) {
 } // namespace
 
 DestMap shortestPaths( RobotPosition from, Size size, std::set< Position > forbid ) {
+
+    if (from.x > size.w) {
+        from.x = size.w;
+    }
+
+    if (from.y > size.h) {
+        from.y = size.h;
+    }
+
     DestMap map{ size, Destination{ Pred::None, inf } };
     map[ from ].distance = 0;
 
